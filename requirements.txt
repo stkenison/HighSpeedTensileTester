@@ -1,0 +1,4 @@
+numpy==1.23.5
+matplotlib==3.6.2
+nptdms==1.5.0
+nidaqmx==0.5.7
