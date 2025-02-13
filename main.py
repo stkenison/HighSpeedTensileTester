@@ -1,3 +1,20 @@
+"""
+High-Speed Tensile Tester Data Collection and Calibration Script
+
+This script collects and processes data from a high-speed tensile tester 
+using a DAQ system. It includes calibration routines for an ultrasonic 
+sensor and a load cell, as well as data acquisition and analysis.
+
+This script was written as a part of MAE 4810 Capstone Senior Design
+at Utah State University.
+
+Author: Spencer Kenison 
+Date Created: 2025-02-06
+Last Modified: 2025--2-13 
+Version: 1.0  
+License: MIT License
+"""
+
 #import necessary functions
 import os; import json; os.system('cls') #clear terminal
 import numpy as np; import matplotlib.pyplot as plt; from numpy.polynomial.polynomial import Polynomial
