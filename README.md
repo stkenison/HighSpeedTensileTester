@@ -13,7 +13,7 @@ The program follows a structured workflow:
 - Calibration functions for **ultrasonic sensor** and **load cell**
 - Saves calibration settings to **JSON files**
 - Uses **polynomial fitting** to convert raw sensor data to meaningful force and displacement values
-- Plots data in real time using **Matplotlib**
+- Plots data in real-time using **Matplotlib**
 
 ## Dependencies
 Ensure you have the following dependencies installed:
@@ -52,15 +52,13 @@ The script reads sensor data at the specified sampling rate and duration, stores
 - **Force vs. Distance**
 
 ### Data Storage
-- `input.json` stores test parameters like sampling rate and duration.
-- `calibration.json` stores sensor calibration data.
+- `config.json` stores test parameters like sampling rate and duration and sensor calibration data.
 - `TestData.tdms` is a temporary file for logged data.
 
 ## File Structure
 ```
 ├── main.py             # Main script
-├── input.json          # User-defined test settings
-├── calibration.json    # Sensor calibration data
+├── config.json    # DAQ settings, tensile test settings, and sensor calibration data
 ├── README.md           # Project documentation
 └── requirements.txt    # List of dependencies
 ```
