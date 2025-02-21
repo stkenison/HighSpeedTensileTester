@@ -58,7 +58,7 @@ The script reads sensor data at the specified sampling rate and duration, stores
 ## File Structure
 ```
 ├── main.py             # Main script
-├── config.json    # DAQ settings, tensile test settings, and sensor calibration data
+├── config.json         # DAQ settings, tensile test settings, and sensor calibration data
 ├── README.md           # Project documentation
 └── requirements.txt    # List of dependencies
 ```
