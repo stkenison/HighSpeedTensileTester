@@ -1,0 +1,53 @@
+{
+    "DAQ_config": {
+        "DAQ_name": "myDAQ1",
+        "load_cell_channel": "ai0",
+        "ultrasonic_channel": "ai1"
+    },
+    "test_config": {
+        "sampling_rate_hz": 1000,
+        "min_sampling_rate_hz": 1,
+        "max_sampling_rate_hz": 300000,
+        "test_duration_ms": 3000,
+        "min_test_duration_ms": 1,
+        "max_test_duration_ms": 10000
+    },
+    "load_cell": {
+        "calibration_date": "2020-01-01T01:01:01.000001-07:00",
+        "calibration_masses_kg": [
+            0,
+            0.1,
+            0.2,
+            0.3,
+            0.4,
+            0.5
+        ],
+        "calibration_voltages": [
+            2.0,
+            2.125,
+            2.25,
+            2.375,
+            2.5,
+            2.625
+        ],
+        "calibration_frequency_hz": 100
+    },
+    "ultrasonic": {
+        "calibration_date": "2020-01-01T01:01:01.000001-07:00",
+        "calibration_distances_m": [
+            0.25,
+            0.5,
+            0.75,
+            1,
+            1.25
+        ],
+        "calibration_voltages": [
+            1,
+            2.5,
+            3.0,
+            4.5,
+            6.0
+        ],
+        "calibration_frequency_hz": 100
+    }
+}
