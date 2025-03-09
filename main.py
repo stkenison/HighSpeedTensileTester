@@ -10,8 +10,8 @@ at Utah State University.
 
 Author: Spencer Kenison 
 Date Created: 2025-02-06
-Last Modified: 2025-2-21
-Version: 1.0.9  
+Last Modified: 2025-3-8
+Version: 1.0.11  
 License: NA
 """
 
@@ -23,7 +23,7 @@ from datetime import datetime; from zoneinfo import ZoneInfo
 from nidaqmx.constants import (READ_ALL_AVAILABLE,AcquisitionType,LoggingMode,LoggingOperation)
 plt.rcParams['font.family'] = 'Times New Roman' #set desired font
 
-default_config_json = {"DAQ_config":{"DAQ_name":"myDAQ1","load_cell_channel":"ai0","ultrasonic_channel":"ai1"},"test_config":{"sampling_rate_hz":1000,"min_sampling_rate_hz":1,"max_sampling_rate_hz":300000,"test_duration_ms":3000,"min_test_duration_ms":1,"max_test_duration_ms":10000},"load_cell":{"calibration_date":"2020-01-01T01:01:01.000001-07:00","calibration_masses_kg":[0,0.1,0.2,0.3,0.4,0.5],"calibration_voltages":[2.0, 2.125, 2.25, 2.375, 2.5, 2.625],"calibration_frequency_hz":100},"ultrasonic":{"calibration_date":"2020-01-01T01:01:01.000001-07:00","calibration_distances_m":[0.25,0.5,0.75,1,1.25],"calibration_voltages":[1,2.5,3.0,4.5,6.0],"calibration_frequency_hz":100}}
+default_config_json = {"DAQ_config":{"name":"myDAQ1","channels":{"load_cell":"ai0","ultrasonic":"ai1"}},"test_config":{"sampling_rate_hz":[1,250,300000],"test_duration_ms":[1,3000,10000]},"load_cell":{"calibration_date":"2025-02-27T13:54:55.730023-07:00","masses_kg":[0,0.1,0.2,0.3,0.4,0.5],"voltages":[2.3881,2.3875,2.3872,2.3878,2.3872,2.3875],"freq_hz":100,"min_variation_warn":0.05},"ultrasonic":{"calibration_date":"2025-02-27T13:56:12.205858-07:00","distances_m":[0.25,0.5,0.75,1,1.25],"voltages":[0.543,1.996,3.468,5.008,6.548],"freq_hz":100,"min_variation_warn":0.05}}
 
 # Get inputs from .json file
 try:
@@ -192,6 +192,40 @@ def calibrate():
         else: print("\nInvalid choice. Please enter 1, 2, or 3.\n")
     return 0
 
+# Calculate line of best fits to interpret data based off of calibration
+def calc_lines_of_best_fit():
+    f_load_cell = Polynomial.fit(np.array(config_data['load_cell']['calibration_voltages']),np.array(config_data['load_cell']['calibration_masses_kg'])*9.8, deg=1) #added factor to account for gravity (kg > N)
+    f_ultrasonic = Polynomial.fit(np.array(config_data['ultrasonic']['calibration_voltages']), np.array(config_data['ultrasonic']['calibration_distances_m']), deg=1)
+    return f_load_cell, f_ultrasonic
+
+def calc_uncertainty(type, y_value):
+    if type not in (0, 1, 3): raise ValueError("Invalid input: 'type' must be 0, 1, or 2.")
+    
+    f_load_cell, f_ultrasonic = calc_lines_of_best_fit()
+
+    # Select appropriate calibration data
+    if type == 0:
+        x = np.array(config_data['load_cell']['calibration_voltages'])
+        y_true = np.array(config_data['load_cell']['calibration_masses_kg']) * 9.8
+        f = f_load_cell
+    elif type == 1:
+        x = np.array(config_data['ultrasonic']['calibration_voltages'])
+        y_true = np.array(config_data['ultrasonic']['calibration_distances_m'])
+        f = f_ultrasonic
+
+    # Find the corresponding x_measured (inverse lookup)
+    x_measured = (y_value - f.coef[0]) / f.coef[1]  # Solve for x using y = m*x + b
+
+    y_pred = f(x) # Compute predicted values
+    residuals = y_pred - y_true #compute residual
+    n = len(x) #number of values in line of best fit
+    std_error = np.sqrt(np.sum(residuals**2) / (n - 2))  # Standard error of regression
+    x_mean = np.mean(x) # Compute uncertainty propagation
+    x_var = np.var(x, ddof=1)  # Variance of x (ddof=1 for sample variance)
+    uncertainty = std_error * np.sqrt(1 + (1/n) + ((x_measured - x_mean)**2 / ((n - 1) * x_var))) # Uncertainty formula for predicted values in a linear regression
+
+    return uncertainty
+
 def collect_data():
 
     # Define parameters
@@ -226,65 +260,155 @@ def collect_data():
             os.remove(file)
 
     # Calculate line of best fits to interpret data based off of calibration
-    f_load_cell = Polynomial.fit(np.array(config_data['load_cell']['calibration_voltages']),np.array(config_data['load_cell']['calibration_masses_kg'])*9.8, deg=1) #added factor to account for gravity (kg > N)
-    f_ultrasonic = Polynomial.fit(np.array(config_data['ultrasonic']['calibration_voltages']), np.array(config_data['ultrasonic']['calibration_distances_m']), deg=1)
+    f_load_cell, f_ultrasonic = calc_lines_of_best_fit() # Calculate line of best fits to interpret data based off of calibration
     load_cell_data = f_load_cell(raw_load_cell_data)
     load_cell_data = load_cell_data-np.mean(load_cell_data[0:10])
     load_cell_data = moving_average(load_cell_data,5) #slightly smooth out load cell data to account for oscillations
     ultrasonic_data = f_ultrasonic(raw_ultrasonic_data)
+    ultrasonic_data = ultrasonic_data-np.mean(ultrasonic_data[0:3])
 
-    # Print data to terminal
+    # Print confirmation to terminal
     print('\nTest Complete.\n')
-    print('Max Force = ', np.max(load_cell_data))
-    print('Max Displacement = ', ultrasonic_data[np.argmax(load_cell_data)])
-    print('\nClose all plots to resume program.\n')
+
+    # Check for issues with data collection
+    if ((np.max(load_cell_data)-np.min(load_cell_data))/np.max(load_cell_data)) < config_data['load_cell']['minimum_data_variation_warning']:
+        print("Warning. Minimal variation observed in load cell data. Error may have occured.\n")
+    if ((np.max(ultrasonic_data)-np.min(ultrasonic_data))/np.max(ultrasonic_data)) < config_data['ultrasonic']['minimum_data_variation_warning']:
+        print("Warning. Minimal variation observed in ultrasonic data. Error may have occured.\n")
 
     return load_cell_data, ultrasonic_data, time  # Return as a tuple
 
-def plot_data(load_cell_data, ultrasonic_data, time):
+# Compute velocity using a stable five-point finite difference method for non-uniform time steps.
+def calculate_velocity(ultrasonic_data, time):
+    n = len(ultrasonic_data)
+    velocity = np.zeros_like(ultrasonic_data, dtype=float)  # Initialize velocity array
 
-    # Create the figure and first axis
-    fig, ax1 = plt.subplots(figsize=(8, 4))
+    # Compute velocity for interior points using a five-point finite difference formula
+    for i in range(2, n - 2):
+        dt1 = time[i+1] - time[i]
+        dt2 = time[i-1] - time[i]
+        dt3 = time[i+2] - time[i]
+        dt4 = time[i-2] - time[i]
+
+        velocity[i] = (2 * (ultrasonic_data[i+1] - ultrasonic_data[i-1]) / (dt1 - dt2) + 
+                      (ultrasonic_data[i-2] - ultrasonic_data[i+2]) / (12 * (dt3 - dt4)))
+
+    # Use a three-point forward difference for first two points
+    velocity[0] = (ultrasonic_data[1] - ultrasonic_data[0]) / (time[1] - time[0])
+    velocity[1] = (ultrasonic_data[2] - ultrasonic_data[1]) / (time[2] - time[1])
+
+    # Use a three-point backward difference for last two points
+    velocity[-1] = (ultrasonic_data[-1] - ultrasonic_data[-2]) / (time[-1] - time[-2])
+    velocity[-2] = (ultrasonic_data[-2] - ultrasonic_data[-3]) / (time[-2] - time[-3])
+
+    return velocity
+
+def process_data(load_cell_data, ultrasonic_data, velocity, time):
+
+    # Find duration of tensile test
+    test_start_threshold = load_cell_data[0]+0.05*(np.max(load_cell_data)-load_cell_data[0]) #identify 5% rise in force, signifying start of tensile test
+    test_start_index = np.where(load_cell_data > test_start_threshold)[0][0] #find index of 5% rise in force, signifying start of tensile test
+    sample_break_index = np.argmax(load_cell_data) #Find index where max force occurs and sample breaks
+
+    # Find desired values from test (max force, breaking displacement, etc.)
+    max_force = np.max(load_cell_data)
+    displacement_at_break = ultrasonic_data[sample_break_index]
+    displacement_at_break_uncertainty = calc_uncertainty(1,displacement_at_break)
+    velocity_at_break = velocity[sample_break_index]
+    average_velocity = np.mean(velocity[test_start_index:sample_break_index])
+    
+    #Print desired values to terminal
+    print(f"Max Force = {max_force:.2f} N")
+    print(f"Displacement at Break = {displacement_at_break:.2f} {chr(177)} {displacement_at_break_uncertainty:.2f} m")
+    print(f"Average Velocity = {average_velocity:.2f} m/s ({(average_velocity*2.23694):.2f} mph)")
+    print(f"Velocity at Break = {velocity_at_break:.2f} m/s ({(velocity_at_break*2.23694):.2f} mph)")
+
+    return max_force, displacement_at_break, velocity_at_break, average_velocity
+
+def export_data(load_cell_data, ultrasonic_data, velocity, time, max_force, displacement_at_break, velocity_at_break, average_velocity):
+    # Get current time and format it
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    # Create filename with timestamp
+    filename = f"tensile_test_data_{timestamp}.csv"
+
+    # Open file and write summary data
+    with open(filename, 'w') as file:
+        file.write(f"Time, {timestamp}\n") 
+        file.write(f"Max Force (N), {max_force:.6f}\n")
+        file.write(f"Displacement at Break (m), {displacement_at_break:.6f}\n")
+        file.write(f"Velocity at Break (m/s), {velocity_at_break:.6f}\n")
+        file.write(f"Average Velocity (m/s), {average_velocity:.6f}\n\n")  # Extra newline for readability
+        file.write("Time (s), Force (N), Displacement (m), Velocity (m/s)\n")  # Column headers
+
+    # Stack arrays column-wise
+    data = np.column_stack((time, load_cell_data, ultrasonic_data, velocity))
+
+    # Append data table to the file
+    with open(filename, 'a') as file:
+        np.savetxt(file, data, delimiter=",", fmt="%.6f")
+
+    print("\nData exported to", filename, "\n")
+    return 0
+
+def plot_data(load_cell_data, ultrasonic_data, velocity, time):
+
+    plt.ion() # Create interactive figures
+
+    # Create figure plotting data as a function of time
+    plt.figure("Data Over Time")
+    plt.plot(time,load_cell_data, label = "Force (N)")
+    plt.plot(time,ultrasonic_data, label = "Displacement (m)")
+    plt.plot(time, velocity, label = "Velocity (m/s)")
+    plt.xlabel("Time (s)")
+    plt.legend()
+
+    # Create figure plotting data as function of distance
+    fig, ax1 = plt.subplots(figsize=(8, 4)) # Create the figure and first axis
+    fig.canvas.manager.set_window_title("Data Over Displacement")
     
     # Plot the first dataset (Force) on the primary y-axis
-    ax1.plot(time, load_cell_data, label="Force (N)", color='b')
-    ax1.set_xlabel("Time (s)")
+    ax1.plot(ultrasonic_data, load_cell_data, label="Force (N)", color='b')
+    ax1.set_xlabel("Displacement (m)")
     ax1.set_ylabel("Force (N)", color='b')
     ax1.tick_params(axis='y', labelcolor='b')
     
     # Create a second y-axis sharing the same x-axis
     ax2 = ax1.twinx()
-    ax2.plot(time, ultrasonic_data, label="Distance (m)", color='r')
-    ax2.set_ylabel("Distance (m)", color='r')
+    ax2.plot(ultrasonic_data, velocity, label="Velocity (m/s)", color='r')
+    ax2.set_ylabel("Velocity (m/s)", color='r')
     ax2.tick_params(axis='y', labelcolor='r')
-
-    # Title and grid
-    plt.title("High-Speed Tensile Tester Data")
-    ax1.grid(True)
-    
-    #plot force over distance data and configure figure
-    plt.figure('Force Over Distance', figsize=(8, 4))
-    plt.plot(ultrasonic_data, load_cell_data, label="Force (N)", color='b')
-    plt.xlabel("Distance(m)")
-    plt.ylabel("Force (N)")
-    plt.title("High-Speed Tensile Tester Data")
-    plt.legend()
-    plt.grid(True)
-
     plt.show()
-    return 0
 
-def export_data(load_cell_data, ultrasonic_data, time):
     return 0
 
 def tensile_test():
     os.system('cls') #clear terminal
-    print("Test selected. Proceeding with data collection...\n")
     
+    # Print options for user
+    while True:
+        
+        print("Tensile test selected.\n")
+        print("Data Collection Frequency:", config_data['test_config']['sampling_rate_hz'], "Hz")
+        print("Data Collection Duration:", config_data['test_config']['test_duration_ms']/1000, "sec\n")
+
+        
+        print("Please confirm the tensile tester is setup properly and no personnel are near.\n")
+        choice = input("Type 'test' to begin tensile test or any key to cancel: ").strip()
+        if choice.lower() == "test".lower(): break # Begin tensile test
+        else: return 0 # Exit program
+        
+    print("\nProceeding with data collection...\n")
+
+    # Call function to perform main actions of tensile test
     load_cell_data, ultrasonic_data, time = collect_data() #Call function to collect data 
-    
-    plot_data(load_cell_data, ultrasonic_data, time) #Call function to visualize data
-    export_data(load_cell_data, ultrasonic_data, time) #Call function to export data
+    velocity = moving_average(calculate_velocity(ultrasonic_data, time),11) #import preprepared data from file
+    max_force, displacement_at_break, velocity_at_break, average_velocity = process_data(load_cell_data, ultrasonic_data, velocity, time) #Call function to process data  
+    export_data(load_cell_data, ultrasonic_data, velocity, time, max_force, displacement_at_break, velocity_at_break, average_velocity) #Call function to export data  
+    plot_data(load_cell_data, ultrasonic_data, velocity, time) #Call function to visualize data
+
+    input("Press Enter to return to main menu...")
+    plt.close('all') #close all open plots
     
     return 0
 
@@ -300,4 +424,4 @@ while True:
     elif choice == "2": calibrate()
     elif choice == "3": settings()
     elif choice == "4": print("\nExiting program.\n"); exit()
-    else: print("\nInvalid choice. Please enter 1, 2, or 3.\n")
+    else: print("\nInvalid choice. Please enter 1, 2, or 3.\n"); time.sleep(1)
