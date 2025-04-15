@@ -10,8 +10,8 @@ at Utah State University.
 
 Author: Spencer Kenison 
 Date Created: 2025-02-06
-Last Modified: 2025-3-8
-Version: 1.0.11  
+Last Modified: 2025-04-15
+Version: 1.0.13
 License: NA
 """
 
@@ -23,7 +23,7 @@ from datetime import datetime; from zoneinfo import ZoneInfo
 from nidaqmx.constants import (READ_ALL_AVAILABLE,AcquisitionType,LoggingMode,LoggingOperation)
 plt.rcParams['font.family'] = 'Times New Roman' #set desired font
 
-default_config_json = {"DAQ_config":{"name":"myDAQ1","channels":{"load_cell":"ai0","ultrasonic":"ai1"}},"test_config":{"sampling_rate_hz":[1,250,300000],"test_duration_ms":[1,3000,10000]},"load_cell":{"calibration_date":"2025-02-27T13:54:55.730023-07:00","masses_kg":[0,0.1,0.2,0.3,0.4,0.5],"voltages":[2.3881,2.3875,2.3872,2.3878,2.3872,2.3875],"freq_hz":100,"min_variation_warn":0.05},"ultrasonic":{"calibration_date":"2025-02-27T13:56:12.205858-07:00","distances_m":[0.25,0.5,0.75,1,1.25],"voltages":[0.543,1.996,3.468,5.008,6.548],"freq_hz":100,"min_variation_warn":0.05}}
+default_config_json = {"DAQ_config":{"DAQ_name":"myDAQ1","load_cell_channel":"ai0","ultrasonic_channel":"ai1"},"test_config":{"sampling_rate_hz":1000,"min_sampling_rate_hz":1,"max_sampling_rate_hz":200000,"test_duration_ms":5000,"min_test_duration_ms":1,"max_test_duration_ms":10000},"load_cell":{"calibration_date":"2025-03-25T14:54:36.456188-06:00","calibration_masses_kg":[0,0.1,0.2,0.3,0.4,0.5],"calibration_voltages":[2.385856775974389,2.3796618783380836,2.3796618783380836,2.385204681486357,2.384878634242341,2.384552586998325],"calibration_frequency_hz":100,"minimum_data_variation_warning":0.05},"ultrasonic":{"calibration_date":"2025-02-27T13:56:12.205858-07:00","calibration_distances_m":[0.25,0.5,0.75,1,1.25],"calibration_voltages":[0.5430377527954988,1.9963933429971803,3.4684966497297864,5.007765688729705,6.548012869461672],"calibration_frequency_hz":100,"minimum_data_variation_warning":0.05}}
 
 # Get inputs from .json file
 try:
@@ -58,7 +58,8 @@ def settings():
         choice = input("Enter your choice (1/2/3): ").strip()
 
         # Edit Testing Frequency
-        if choice == "1":
+        if choice.lower() == "exit": print("\nExiting program.\n"); exit()  # Close program
+        elif choice == "1": 
             while True:
                 try:
                     new_frequency = int(input("\nEnter the desired test frequency in Hz: ")) # Get new test frequency from user
@@ -113,7 +114,8 @@ def calibrate_ultrasonic():
             choice = input("Press 'y' when ready or 'c' to cancel: ").strip()
             
             # get 1 second of data from DAQ for calibration
-            if choice in ['y', 'Y']: 
+            if choice.lower() == "exit": print("\nExiting program.\n"); exit()  # Close program
+            elif choice in ['y', 'Y']: 
                 with nidaqmx.Task() as task:
                     freq = np.round(config_data['ultrasonic']['calibration_frequency_hz']).astype(int) #get desired frequency from input file
                     task.ai_channels.add_ai_voltage_chan("myDAQ1/ai1") #create task to record ultrasonic voltage
@@ -141,7 +143,8 @@ def calibrate_load_cell():
             choice = input("Press 'y' when ready or 'c' to cancel: ").strip()
             
             # get 1 second of data from DAQ for calibration
-            if choice in ['y', 'Y']: 
+            if choice.lower() == "exit": print("\nExiting program.\n"); exit()  # Close program
+            elif choice in ['y', 'Y']: 
                 with nidaqmx.Task() as task:
                     freq = np.round(config_data['load_cell']['calibration_frequency_hz']).astype(int) #get desired frequency from input file
                     task.ai_channels.add_ai_voltage_chan("myDAQ1/ai0") #create task to record load cell voltage
@@ -155,6 +158,8 @@ def calibrate_load_cell():
 
     #close out ultrasonic sensor calibration
     print("\nLoad cell calibration complete.\n") 
+    plt.plot(config_data['load_cell']['calibration_voltages'],config_data['load_cell']['calibration_masses_kg'])
+    plt.show()
     config_data['load_cell']['calibration_date'] = datetime.now(ZoneInfo("America/Denver")).isoformat() # Update the date in the JSON data
     with open('config.json', 'w') as f: json.dump(config_data, f, indent=4) # Write the updated JSON data back to the file
     return 0
@@ -176,18 +181,12 @@ def calibrate():
         print("2 - Calibrate Ultrasonic Sensor")
         print("3 - Exit Calibration")
 
+        # User selects desired calibration option
         choice = input("Enter your choice (1/2/3): ").strip()
-
-        # Load Cell Calibration
-        if choice == "1": calibrate_load_cell()
-
-        # Ultrasonic Calibration
-        elif choice == "2": calibrate_ultrasonic()
-
-        # Exit Calibration Menu
-        elif choice == "3":
-            print("\nReturning to main menu.\n")
-            break
+        if choice.lower() == "exit": print("\nExiting program.\n"); exit()  # Close program
+        elif choice == "1": calibrate_load_cell() # Load Cell Calibration
+        elif choice == "2": calibrate_ultrasonic() # Ultrasonic Calibration
+        elif choice == "3": print("\nReturning to main menu.\n"); break # Exit Calibration Menu
 
         else: print("\nInvalid choice. Please enter 1, 2, or 3.\n")
     return 0
@@ -267,6 +266,10 @@ def collect_data():
     ultrasonic_data = f_ultrasonic(raw_ultrasonic_data)
     ultrasonic_data = ultrasonic_data-np.mean(ultrasonic_data[0:3])
 
+    '''# TEMPORARY FUNCTION TO BE DELETED
+    load_cell_data = raw_load_cell_data 
+    ultrasonic_data = raw_ultrasonic_data'''
+
     # Print confirmation to terminal
     print('\nTest Complete.\n')
 
@@ -335,6 +338,8 @@ def export_data(load_cell_data, ultrasonic_data, velocity, time, max_force, disp
     # Open file and write summary data
     with open(filename, 'w') as file:
         file.write(f"Time, {timestamp}\n") 
+        file.write(f"Test Duration (s), {(config_data['test_config']['test_duration_ms']/1000):.2f}\n") 
+        file.write(f"Test Frequency (Hz), {config_data['test_config']['sampling_rate_hz']:.2f}\n")
         file.write(f"Max Force (N), {max_force:.6f}\n")
         file.write(f"Displacement at Break (m), {displacement_at_break:.6f}\n")
         file.write(f"Velocity at Break (m/s), {velocity_at_break:.6f}\n")
@@ -359,7 +364,7 @@ def plot_data(load_cell_data, ultrasonic_data, velocity, time):
     plt.figure("Data Over Time")
     plt.plot(time,load_cell_data, label = "Force (N)")
     plt.plot(time,ultrasonic_data, label = "Displacement (m)")
-    plt.plot(time, velocity, label = "Velocity (m/s)")
+    #plt.plot(time, velocity, label = "Velocity (m/s)")
     plt.xlabel("Time (s)")
     plt.legend()
 
@@ -368,7 +373,7 @@ def plot_data(load_cell_data, ultrasonic_data, velocity, time):
     fig.canvas.manager.set_window_title("Data Over Displacement")
     
     # Plot the first dataset (Force) on the primary y-axis
-    ax1.plot(ultrasonic_data, load_cell_data, label="Force (N)", color='b')
+    #ax1.plot(ultrasonic_data, load_cell_data, label="Force (N)", color='b')
     ax1.set_xlabel("Displacement (m)")
     ax1.set_ylabel("Force (N)", color='b')
     ax1.tick_params(axis='y', labelcolor='b')
@@ -395,7 +400,8 @@ def tensile_test():
         
         print("Please confirm the tensile tester is setup properly and no personnel are near.\n")
         choice = input("Type 'test' to begin tensile test or any key to cancel: ").strip()
-        if choice.lower() == "test".lower(): break # Begin tensile test
+        if choice.lower() == "exit": print("\nExiting program.\n"); exit()  # Close program
+        elif choice.lower() == "test".lower(): break # Begin tensile test
         else: return 0 # Exit program
         
     print("\nProceeding with data collection...\n")
@@ -423,5 +429,5 @@ while True:
     if choice == "1": tensile_test()
     elif choice == "2": calibrate()
     elif choice == "3": settings()
-    elif choice == "4": print("\nExiting program.\n"); exit()
+    elif choice.lower() == "4" or "exit": print("\nExiting program.\n"); exit()
     else: print("\nInvalid choice. Please enter 1, 2, or 3.\n"); time.sleep(1)
