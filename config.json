@@ -5,15 +5,15 @@
         "ultrasonic_channel": "ai1"
     },
     "test_config": {
-        "sampling_rate_hz": 250,
+        "sampling_rate_hz": 500,
         "min_sampling_rate_hz": 1,
-        "max_sampling_rate_hz": 300000,
-        "test_duration_ms": 3000,
+        "max_sampling_rate_hz": 200000,
+        "test_duration_ms": 5000,
         "min_test_duration_ms": 1,
         "max_test_duration_ms": 10000
     },
     "load_cell": {
-        "calibration_date": "2025-02-27T13:54:55.730023-07:00",
+        "calibration_date": "2025-03-25T14:54:36.456188-06:00",
         "calibration_masses_kg": [
             0,
             0.1,
@@ -23,12 +23,12 @@
             0.5
         ],
         "calibration_voltages": [
-            2.3881391066825017,
-            2.3874870121944696,
-            2.3871609649504535,
-            2.3878130594384857,
-            2.3871609649504535,
-            2.3874870121944696
+            2.385856775974389,
+            2.3796618783380836,
+            2.3796618783380836,
+            2.385204681486357,
+            2.384878634242341,
+            2.384552586998325
         ],
         "calibration_frequency_hz": 100,
         "minimum_data_variation_warning": 0.05
