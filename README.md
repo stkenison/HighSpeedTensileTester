@@ -1,7 +1,7 @@
 # High-Speed Tensile Tester Data Collection and Calibration
 
 ## Introduction
-This Python script is designed to collect and process data from a high-speed tensile testing setup using an NI DAQ system. The script allows users to calibrate ultrasonic and load cell sensors, perform tensile tests, and visualize the collected data through plots.
+This Python script is designed to collect and process data from a high-speed tensile testing setup using an NI myDAQ system. The script allows users to calibrate ultrasonic and load cell sensors, perform tensile tests, and visualize the collected data through plots.
 
 The program follows a structured workflow:
 - **Calibration**: Guides the user through calibrating the ultrasonic sensor and load cell.
@@ -9,68 +9,88 @@ The program follows a structured workflow:
 - **Data Visualization**: Plots force versus displacement and time-based sensor readings.
 
 ## Features
-- Supports **NI DAQ** for high-speed data acquisition
+- Supports **NI myDAQ** for high-speed data acquisition
 - Calibration functions for **ultrasonic sensor** and **load cell**
 - Saves calibration settings to **JSON files**
 - Uses **polynomial fitting** to convert raw sensor data to meaningful force and displacement values
 - Plots data in real-time using **Matplotlib**
 
 ## Dependencies
-Ensure you have the following dependencies installed:
+Ensure you have the following Python libraries installed:
 ```bash
 pip install numpy matplotlib nptdms nidaqmx
 ```
-The script also uses built-in Python libraries such as `os`, `json`, and `datetime`.
+The script also uses standard Python libraries such as `os`, `json`, and `datetime`.
 
-## Installation
-1. Clone the repository:
+## Installation and Setup
+
+### 1. Download Drivers
+Download the NI myDAQ drivers from the National Instruments website:  
+[NI myDAQ Software Suite](https://www.ni.com/en/support/downloads/software-products/download.mydaq-software-suite.html#305519)
+
+### 2. Hardware Connection
+Connect your **NI myDAQ** device to your computer via USB.
+
+### 3. Clone the Repository
 ```bash
 git clone https://github.com/yourusername/high-speed-tensile-tester.git
-```
-2. Navigate to the project directory:
-```bash
 cd high-speed-tensile-tester
 ```
-3. Install dependencies as listed above.
+
+### 4. (Optional but Recommended) Create a Virtual Environment
+```bash
+python -m venv venv
+venv\Scripts\activate  # On Windows
+```
+
+### 5. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
 
 ## Usage
-Run the script using:
+
+### Running the Script
+To run the main program:
 ```bash
-python main.py
+py main.py
 ```
-Upon execution, you will be presented with a menu:
-1. **Test**: Initiates the data collection process.
-2. **Calibration**: Allows calibration of ultrasonic and load cell sensors.
-3. **Exit Program**: Exits the script.
+
+You will be presented with a menu:
+1. **Test**: Start data collection.
+2. **Calibration**: Calibrate the sensors.
+3. **Exit Program**: Close the application.
 
 ### Calibration
-For accurate data collection, perform sensor calibration by selecting **Calibration** from the main menu. The script will prompt you to place known weights on the load cell and set distances for the ultrasonic sensor.
+Select **Calibration** to perform calibration procedures:
+- **Ultrasonic Sensor**: Set known distances.
+- **Load Cell**: Place known weights for force calibration.
+
+Calibration data is saved to `config.json` for later use.
 
 ### Data Collection
-The script reads sensor data at the specified sampling rate and duration, stores it in a TDMS file, and processes it to extract force and displacement values. It then generates two plots:
-- **Time-based data** (Force and Distance over time)
-- **Force vs. Distance**
+After initiating a tensile test:
+- Data is collected using the NI myDAQ and stored in a temporary TDMS file (`TestData.tdms`)
+- Polynomial fits are applied to sensor readings
+- The script plots:
+  - **Force and Distance vs. Time**
+  - **Force vs. Distance**
 
 ### Data Storage
-- `config.json` stores test parameters like sampling rate and duration and sensor calibration data.
-- `TestData.tdms` is a temporary file for logged data.
+- `config.json`: Stores test parameters and calibration data
+- `TestData.tdms`: Temporary TDMS data file used during analysis
 
 ## File Structure
 ```
 ├── main.py             # Main script
-├── config.json         # DAQ settings, tensile test settings, and sensor calibration data
+├── config.json         # Sensor calibration and DAQ settings
 ├── README.md           # Project documentation
 └── requirements.txt    # List of dependencies
 ```
 
 ## Future Improvements
-- Implement data saving and export to CSV format
-- Add GUI for easier user interaction
-- Improve real-time visualization during data collection
-
-## License
-This project is licensed under the MIT License. See `LICENSE` for details.
+- Develop a GUI for simplified user interaction
+- Enhance real-time plotting and analysis features
 
 ## Contact
-For questions or contributions, contact spencer.kenison@gmail.com or open an issue on GitHub.
-
+For questions or contributions, please contact **spencer.kenison@gmail.com**.
